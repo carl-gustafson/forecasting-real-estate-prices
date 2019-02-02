@@ -1,0 +1,261 @@
+---
+title: "422 Project"
+authors: "Carl-Oscar Gustafson, Juan Manubens, Jack Soslow, David Baxter, Raul Mendez, William Fry, Liubov Vazhenina, Kwang Jun Lee"
+date: "February 26, 2017"
+output: html_document
+---
+
+```{r}
+install.packages("randomForest")
+library(randomForest)
+```
+
+
+
+```{r}
+all_data_raw <- read.csv("Jack Soslow data set.csv")
+
+ProjectData <- read.csv("~/Development/School/STAT422/scraper/project/cleaned_data_set.csv")
+
+# Clean Maintenance
+ProjectData$Maintenance <- sub("\\$","",ProjectData$Maintenance)
+ProjectData$Maintenance <- gsub(",","",ProjectData$Maintenance)
+ProjectData$Maintenance <- as.numeric(ProjectData$Maintenance)
+
+maintenance.avg <- mean(ProjectData[!is.na(ProjectData$Maintenance),]$Maintenance)
+
+ProjectData[ProjectData$Zip=="11416",]$Maintenance <- maintenance.avg
+ProjectData[ProjectData$Zip=="11433",]$Maintenance <- maintenance.avg
+ProjectData[ProjectData$Zip=="11429",]$Maintenance <- maintenance.avg
+ProjectData[ProjectData$Zip=="11420",]$Maintenance <- maintenance.avg
+
+# Clean City
+ProjectData[ProjectData$Index=="1338",]$City <- "Bayside"
+ProjectData[ProjectData$Index=="3624",]$City <- "Village"
+
+# Clean Parking Charges
+ProjectData$Parking.Charges <- sub("\\$","",ProjectData$Parking.Charges)
+ProjectData$Parking.Charges <- gsub(",","",ProjectData$Parking.Charges)
+ProjectData$Parking.Charges <- as.numeric(ProjectData$Parking.Charges)
+
+# Drop miscoded row with gibberish
+ProjectData <- ProjectData[-c(which(ProjectData$Index=="214")),]
+
+parking.avg <- mean(ProjectData[!is.na(ProjectData$Parking.Charges),]$Parking.Charges)
+
+ProjectData[ProjectData$Zip=="11370",]$Parking.Charges <- parking.avg
+ProjectData[ProjectData$Zip=="11378",]$Parking.Charges <- parking.avg
+ProjectData[ProjectData$Zip=="11101",]$Parking.Charges <- parking.avg
+ProjectData[ProjectData$Zip=="11413",]$Parking.Charges <- parking.avg
+ProjectData[ProjectData$Zip=="11416",]$Parking.Charges <- parking.avg
+ProjectData[ProjectData$Zip=="11420",]$Parking.Charges <- parking.avg
+ProjectData[ProjectData$Zip=="11429",]$Parking.Charges <- parking.avg
+ProjectData[ProjectData$Zip=="11433",]$Parking.Charges <- parking.avg
+ProjectData[ProjectData$Zip=="11434",]$Parking.Charges <- parking.avg
+
+# Clean Baths
+baths.avg.11367 <- mean(na.omit(ProjectData[ProjectData$Zip=="11367",]$Baths.Full))
+baths.avg.11421 <- mean(na.omit(ProjectData[ProjectData$Zip=="11421",]$Baths.Full))
+baths.avg.11360 <- mean(na.omit(ProjectData[ProjectData$Zip=="11360",]$Baths.Full))
+ProjectData[ProjectData$Index=="2195",]$Baths.Full <-baths.avg.11367
+ProjectData[ProjectData$Index=="3499",]$Baths.Full <- baths.avg.11421
+ProjectData[ProjectData$Index=="1219",]$Baths.Full <- baths.avg.11360
+
+# Clean Total Taxes
+ProjectData[is.na(ProjectData$Total.Taxes),]
+ProjectData$Total.Taxes <- sub("\\$","",ProjectData$Total.Taxes)
+ProjectData$Total.Taxes <- gsub(",","",ProjectData$Total.Taxes)
+ProjectData$Total.Taxes <- as.numeric(ProjectData$Total.Taxes)
+
+taxes.avg <- mean(na.omit(ProjectData$Total.Taxes))
+ProjectData[ProjectData$Zip=="11004",]$Total.Taxes <- taxes.avg
+ProjectData[ProjectData$Zip=="11005",]$Total.Taxes <- taxes.avg
+ProjectData[ProjectData$Zip=="11366",]$Total.Taxes <- taxes.avg
+ProjectData[ProjectData$Zip=="11369",]$Total.Taxes <- taxes.avg
+ProjectData[ProjectData$Zip=="11413",]$Total.Taxes <- taxes.avg
+ProjectData[ProjectData$Zip=="11426",]$Total.Taxes <- taxes.avg
+
+# Clean Fuel
+ProjectData$Fuel <- toupper(ProjectData$Fuel)
+ProjectData$Fuel <- gsub("ELECTRIC","ELEC",ProjectData$Fuel)
+ProjectData$Fuel <- gsub("-","UNSPECIFIED",ProjectData$Fuel)
+ProjectData$Fuel <- gsub("NONE","OTHER",ProjectData$Fuel)
+ProjectData$Fuel <- gsub("UNSPECIFIED","OTHER",ProjectData$Fuel)
+ProjectData$Fuel <- as.factor(ProjectData$Fuel)
+
+# Clean High Schools
+ProjectData$high_schools <- gsub(",","",ProjectData$high_schools)
+ProjectData$high_schools <- trimws(ProjectData$high_schools)
+ProjectData[ProjectData$high_schools=="",]$high_schools <- "Citywide High School Choice"
+ProjectData$high_schools <- as.factor(ProjectData$high_schools)
+
+# Clean Deductible
+ProjectData$Deductible.. <- gsub("%","",ProjectData$Deductible..)
+ProjectData$Deductible.. <- sub("\\$","",ProjectData$Deductible..)
+ProjectData$Deductible.. <- as.numeric(ProjectData$Deductible..)
+
+deductible.avg <- mean(na.omit(ProjectData$Deductible..))
+ProjectData[is.na(ProjectData$Deductible..),]$Deductible.. <- deductible.avg
+
+# Clean Garage
+ProjectData$Garage <- gsub("eys","Yes",ProjectData$Garage)
+ProjectData$Garage <- sub("UG","Yes",ProjectData$Garage)
+ProjectData$Garage <- gsub("Underground","Yes",ProjectData$Garage)
+ProjectData$Garage <- toupper(ProjectData$Garage)
+ProjectData$Garage <- as.character(ProjectData$Garage)
+ProjectData[ProjectData$Garage!="YES",]$Garage <- "NO"
+ProjectData$Garage <- as.factor(ProjectData$Garage)
+
+write.csv(ProjectData,file="cleaned_data.csv")
+
+# Clean Common Charges
+ProjectData$Common.Charges <- sub("\\$","",ProjectData$Common.Charges)
+ProjectData$Common.Charges <- as.numeric(ProjectData$Common.Charges)
+
+
+all_data_raw <- ProjectData
+# Get info about data sets
+
+str(all_data_raw)
+columns_all_data <- names(all_data_raw)
+columns_all_data
+dim(all_data_raw)
+
+# Reorder columns: Put Y (Sold.Price at the end of data frame) and Index, 
+# STAT_422_ID_NUMBER, Street.Adress, Full.Address, URL, Model in the beginning
+
+new_order <- c(c("Index","STAT_422_ID_NUMBER","Full.Address","URL","Model","Street.Address"),
+               c(columns_all_data),
+               c("Sold.Price"))
+new_order <- unique(new_order)
+soldprice_index <- which(new_order == "Sold.Price")
+new_order <- c(new_order[-soldprice_index],new_order[soldprice_index])
+all_data_raw <- all_data_raw[,new_order]
+
+# Check
+names(all_data_raw) == new_order
+
+
+# Create data for model (remove unnecessary columns)
+# 1. Remove listing_price_to_nearest_1000 column
+
+# to_eliminate <- c(which(names(all_data_raw)=="listing_price_to_nearest_1000"))
+
+all_data_clean <- all_data_raw
+
+
+# Convert some variable types to appropriate types
+
+all_data_clean$Maintenance <- as.integer(all_data_clean$Maintenance)
+
+all_data_clean$Parking.Charges <- as.integer(all_data_clean$Parking.Charges)
+
+all_data_clean$Total.Taxes <- as.integer(all_data_clean$Total.Taxes)
+
+all_data_clean$Common.Charges <- as.integer(all_data_clean$Common.Charges)
+
+all_data_clean$Approx..Interior.Sqft <- as.integer(all_data_clean$Approx..Interior.Sqft)
+
+all_data_clean$Zip <- as.factor(all_data_clean$Zip)
+
+all_data_clean$Baths.Full <- as.factor(all_data_clean$Baths.Full)
+
+all_data_clean$Bedrooms <- as.factor(all_data_clean$Bedrooms)
+
+all_data_clean$School <- as.factor(all_data_clean$School)
+
+all_data_clean$Beds <- as.factor(all_data_clean$Beds)
+
+all_data_clean$Baths.Half <- as.factor(all_data_clean$Baths.Half)
+
+
+# Check for NAs by columns
+install.packages('pander')
+library(pander)
+
+NAs_all_data <- sapply(all_data_clean, function(x){ sum(is.na(x))})
+pandoc.table(NAs_all_data,caption="NAs in Data")
+
+# Separate into prediction and training sets
+
+all_data_clean$Beds <- as.numeric(all_data_clean$Beds)
+all_data_clean[is.na(all_data_clean$Beds),]$Beds <- mean(as.numeric(na.omit(all_data_clean$Beds)))
+all_data_clean$Common.Charges <- as.numeric(all_data_clean$Common.Charges)
+all_data_clean[is.na(all_data_clean$Common.Charges),]$Common.Charges <- mean(as.numeric(na.omit(all_data_clean$Common.Charges)))
+
+
+data_train <- all_data_clean[which(is.na(all_data_clean$STAT_422_ID_NUMBER)),]
+data_predict <- all_data_clean[which(!is.na(all_data_clean$STAT_422_ID_NUMBER)),]
+
+# Take out Sold.Price from prediction set
+to_eliminate_p <- c(which(names(data_predict)=="Sold.Price"))
+data_predict <- data_predict[,-to_eliminate_p]
+
+# Check for NAs by columns
+
+NAs_train <- sapply(data_train, function(x){ sum(is.na(x))})
+pandoc.table(NAs_train,caption="NAs in Training Set")
+
+NAs_predict <- sapply(data_predict, function(x){ sum(is.na(x))})
+pandoc.table(NAs_predict,caption="NAs in Prediction Set")
+
+# Review types
+str(data_train)
+str(data_predict)
+
+
+#Random Forest Model
+library(randomForest)
+rf_model <- randomForest(Sold.Price ~ walk_score + Approx..Interior.Sqft + Maintenance + Approx.Year.Built +  high_schools + Common.Charges + Bedrooms + Baths.Full + Baths.Half + Style + Zip + Total.Rooms +  TOTAL.SEVEN.MAJOR.FELONY.OFFENSES.5.YR_AVG, data=data_train, na.action = na.exclude)
+
+names(rf_model)
+rf_model$ntree
+rf_model
+#Predictions by 422 ID
+
+#3047  249 3340 2521 2007 3177  178 3725
+
+
+data_train$predictions <- predict(rf_model, data_train)
+
+data_train$Sold.Price <- as.numeric(data_train$Sold.Price)
+
+
+data_predict <- data_predict[order(data_predict$STAT_422_ID_NUMBER),]
+data_predict
+cor(predict(rf_model, data_train), data_train$Sold.Price)^2
+predictions <- predict(rf_model, data_predict)
+
+
+results <- rep(0, length(predictions))
+names(results) <- rep(0, length(predictions))
+for (i in 1:length(predictions)) {
+  results[i] <- predictions[i]
+  names(results[i]) <- ProjectData[c(names(predictions[i])),]$STAT_422_ID_NUMBER
+}
+
+names(results) <- ProjectData[c(names(predictions)),]$STAT_422_ID_NUMBER
+predictions
+sum(is.na(predictions))
+
+names(results[is.na(results)])
+
+final_results <- data.frame(STAT_422_ID=names(results), PREDICTION=results)
+write.csv(final_results, "STAT_422_Predictions.csv")
+write.csv(all_data_clean, "STAT_422_Historical_Data.csv")
+
+#"34"  "50"  "162" "178" "270" "271" "513" "918"
+
+data_predict[is.nadata_predict$STAT_422_ID_NUMBER=="50",]
+data_predict
+
+```
+
+
+
+
+
+
+
+
+
